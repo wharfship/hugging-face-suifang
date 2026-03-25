@@ -1,10 +1,11 @@
-from Model_initialization import *
+﻿from Model_initialization import *
 import gradio as gr
 import os
 import re
 import time
 
 from excel_adjusting import *
+from field_rules import apply_field_completion_rules
 from workflow_status import (
     finalize_after_attempt_limit,
     get_field_attempt_limit,
@@ -13,7 +14,7 @@ from workflow_status import (
 )
 
 
-excel_path = 'medium.xls'
+excel_path = '2025.5.28人工智能供者随访计划excel版.xls'
 metadata = load_excel_template(excel_path)
 tracker = FieldStateTracker(metadata)
 field_attempts = {}
@@ -143,7 +144,9 @@ def process_user_input(user_message, chat_history):
 
     start_parse = time.time()
     raw_result = parse_answer(field, user_message, metadata[field]["描述"], history_text)
+    # 先把模型输出归一化，再用字段规则做一次“填表口径”校正。
     result = normalize_parse_result(raw_result)
+    result = apply_field_completion_rules(field, result)
     end_parse = time.time()
 
     print(f"🔍 解析 parse_answer() 耗时：{end_parse - start_parse:.2f} 秒")

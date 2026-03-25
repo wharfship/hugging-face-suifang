@@ -4,6 +4,7 @@ import re
 import pandas as pd
 from openai import OpenAI
 
+from field_rules import build_field_rule_prompt
 from state_tracking import FieldStateTracker
 from statistic_preprocessing import load_excel_template
 
@@ -14,86 +15,12 @@ client = OpenAI(
 )
 
 
-YES_NO_FIELDS = {
-    "当前有无糖尿病",
-    "当前有无高血压",
-    "是否曾患冠心病",
-    "是否曾患脑血管病",
-    "近一年是否存在手术切口疼痛",
-}
-
-
 def _append_field_specific_guidance(prompt, field):
-    if field in YES_NO_FIELDS:
-        prompt += """
-        特别注意：这是简单的是/否字段。
-        - 若患者表达肯定，field_value输出“是”
-        - 若患者表达否定，field_value输出“否”
-        - 若无法判断，field_value输出“未知”
-        """
-
-    if field == "当前身高":
-        prompt += """
-        特别注意：
-        - 允许提取大致身高，如“170多”可记为“170cm”
-        - 单位统一为 cm
-        """
-
-    if field == "当前体重":
-        prompt += """
-        特别注意：
-        - 允许提取大致体重，如“一百五十多斤”可记为“75kg”
-        - 单位统一为 kg
-        """
-
-    if field == "（若曾患脑血管病）具体疾病、治疗方式及有无后遗症":
-        prompt += """
-        特别注意：
-        - 只需提取疾病类型、大致治疗方式、是否有后遗症
-        - 无需追求治疗细节
-        """
-
-    if field == "（若有糖尿病）药物控制方案":
-        prompt += """
-        特别注意：
-        - 只需提取大致用药方案、控制情况即可
-        - 不需要过细剂量和疗程
-        """
-
-    if field == "其余病史及用药情况":
-        prompt += """
-        特别注意：
-        - 若明确没有其他病史，field_value输出“否”
-        - 若有病史，尽量提取到具体疾病名称
-        """
-
-    if field == "（若有其余病史）请描述具体疾病、治疗方式、用药种类、用法、治疗效果":
-        prompt += """
-        特别注意：
-        - 只需提取大致疾病、治疗方式、药物名称和大致用法
-        - 无需追求非常细的剂量和疗效描述
-        """
-
-    if field == "近一年是否存在手术切口疼痛":
-        prompt += """
-        特别注意：
-        - 只需确认近一年内有无手术切口疼痛即可
-        - 大致时间即可，不必深挖细节
-        """
-
-    if field == "（若存在手术切口疼痛）手术切口疼痛持续时间":
-        prompt += """
-        特别注意：
-        - 可接受“术后至今”“间断出现”等大致表述
-        """
-
-    if field == "随访时受者状态":
-        prompt += """
-        特别注意：
-        - 只需提取可以直接写入表格的简洁状态描述
-        """
-
-    return prompt
+    # 这里不再手写一大串 if field == ... 的 prompt，改成从规则表里取。
+    rule_prompt = build_field_rule_prompt(field)
+    if not rule_prompt:
+        return prompt
+    return f"{prompt}\n{rule_prompt}\n"
 
 
 def generate_question(field, metadata, history, status="first_ask"):
@@ -114,6 +41,7 @@ def generate_question(field, metadata, history, status="first_ask"):
     3. 问句要自然、简洁、口语化，不要写开场白。
     4. 对复杂字段，可以拆成一个更容易回答的小问题，但一次只问当前最关键的一步。
     5. 如果字段是是/否类问题，用最直接的问法。
+    6. 如涉及时间，当前时间按 2025 年 10 月 30 日理解。
     """
 
     prompt = _append_field_specific_guidance(prompt, field)
@@ -128,9 +56,7 @@ def generate_question(field, metadata, history, status="first_ask"):
     return completion.choices[0].message.content.strip()
 
 
-# 解析答案函数，系统角色设定为数据解析助手，负责根据对话内容提取要填写的东西
-# 解析助手输入当前字段名 field、患者回答 answer、字段描述 description、完整对话 history
-
+# 模型先负责“提取”，字段规则层再负责“校正”。
 def parse_answer(field, answer, description, history):
     """解析患者回答并提取结构化数据"""
     prompt = f"""
@@ -167,6 +93,7 @@ def parse_answer(field, answer, description, history):
     6. 单位自动标准化，如斤转 kg、米转 cm。
     7. field_value 只写适合落表的结果，不写建议、不写解释。
     8. evidence 只摘取与当前字段有关的关键对话，不要抄整段无关历史。
+    9. 如涉及时间，当前时间按 2025 年 10 月 30 日理解。
     """
 
     prompt = _append_field_specific_guidance(prompt, field)
