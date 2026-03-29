@@ -1,6 +1,6 @@
 import json
 import re
-
+import os
 import pandas as pd
 from openai import OpenAI
 
@@ -8,12 +8,11 @@ from field_rules import build_field_rule_prompt
 from state_tracking import FieldStateTracker
 from statistic_preprocessing import load_excel_template
 
-
 client = OpenAI(
-    api_key="sk-c52fb472f73a464cab9eee6f9eb07f19",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+    # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx"
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
-
 
 def _append_field_specific_guidance(prompt, field):
     # 这里不再手写一大串 if field == ... 的 prompt，改成从规则表里取。

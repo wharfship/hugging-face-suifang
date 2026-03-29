@@ -10,10 +10,10 @@ from statistic_preprocessing import load_excel_template
 
 
 client = OpenAI(
-    api_key="sk-c52fb472f73a464cab9eee6f9eb07f19",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+    # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx"
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
-
 
 def _append_field_specific_guidance(prompt, field):
     # simple 版仍然使用字段规则，但不再让模型返回解释和依据。
