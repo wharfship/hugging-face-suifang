@@ -34,7 +34,8 @@ def format_excel(file_path, save_path=None):
     wb.save(save_path)
     return True
 
-# 使用示例
-script_dir = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(script_dir, "医疗数据.xlsx")
-format_excel(file_path, "医疗数据.xlsx")
+if __name__ == "__main__":
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(script_dir, "medical_data.xlsx")
+    if os.path.exists(file_path):
+        format_excel(file_path, file_path)

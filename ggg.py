@@ -3,6 +3,7 @@ import gradio as gr
 import os
 import re
 import time
+from pathlib import Path
 
 from excel_adjusting import *
 from field_rules import apply_field_completion_rules
@@ -14,7 +15,11 @@ from workflow_status import (
 )
 
 
-excel_path = '2025.5.28人工智能供者随访计划excel版.xls'
+BASE_DIR = Path(__file__).resolve().parent
+template_candidates = sorted(BASE_DIR.glob("2025.5.28*excel*.xls"))
+if not template_candidates:
+    raise FileNotFoundError(f"Excel template not found in {BASE_DIR}")
+excel_path = template_candidates[0]
 metadata = load_excel_template(excel_path)
 tracker = FieldStateTracker(metadata)
 field_attempts = {}
@@ -34,12 +39,10 @@ COLUMN_NAMES = {
 def export_tracker_data():
     df = pd.DataFrame(tracker.get_parse_history())
     df = df.rename(columns=COLUMN_NAMES)
-    excel_file = "医疗数据.xlsx"
+    excel_file = BASE_DIR / "medical_data.xlsx"
     df.to_excel(excel_file, index=False, engine="openpyxl")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(script_dir, "医疗数据.xlsx")
-    format_excel(file_path, "医疗数据.xlsx")
-    return df, file_path
+    format_excel(excel_file, excel_file)
+    return df, str(excel_file)
 
 
 def add_assistant_message(message, current_chat_history):
@@ -205,21 +208,19 @@ def process_user_input(user_message, chat_history):
 
 
 def download_data():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(script_dir, "医疗数据.xlsx")
+    file_path = BASE_DIR / "medical_data.xlsx"
     if not os.path.exists(file_path):
-        print(f"警告: 文件 {file_path} 不存在!")
-    return file_path
+        _, generated_path = export_tracker_data()
+        return generated_path
+    return str(file_path)
 
 
 def on_edit(edited_df):
-    """dataframe 数据编辑后，进行保存"""
-    excel_file = "医疗数据.xlsx"
+    """Save edited dataframe."""
+    excel_file = BASE_DIR / "medical_data.xlsx"
     edited_df.copy().to_excel(excel_file, index=False, engine="openpyxl")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(script_dir, "医疗数据.xlsx")
-    format_excel(file_path, "医疗数据.xlsx")
-    return gr.update(value="✅ 已自动保存（内存）"), file_path
+    format_excel(excel_file, excel_file)
+    return gr.update(value="Saved" ), str(excel_file)
 
 
 with gr.Blocks(title="AI医疗随访系统") as demo:

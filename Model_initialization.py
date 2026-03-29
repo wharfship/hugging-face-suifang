@@ -8,11 +8,20 @@ from field_rules import build_field_rule_prompt
 from state_tracking import FieldStateTracker
 from statistic_preprocessing import load_excel_template
 
-client = OpenAI(
-    # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx"
-    api_key=os.getenv("DASHSCOPE_API_KEY"),
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-)
+client = None
+
+
+def get_client():
+    global client
+    if client is None:
+        api_key = os.getenv("DASHSCOPE_API_KEY")
+        if not api_key:
+            raise RuntimeError("Missing DASHSCOPE_API_KEY. Set it in your environment or Hugging Face Space secrets.")
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+    return client
 
 def _append_field_specific_guidance(prompt, field):
     # 这里不再手写一大串 if field == ... 的 prompt，改成从规则表里取。
@@ -45,7 +54,7 @@ def generate_question(field, metadata, history, status="first_ask"):
 
     prompt = _append_field_specific_guidance(prompt, field)
 
-    completion = client.chat.completions.create(
+    completion = get_client().chat.completions.create(
         model="qwen-plus",
         messages=[
             {"role": "system", "content": "你是一名专业的医疗随访助手"},
@@ -97,7 +106,7 @@ def parse_answer(field, answer, description, history):
 
     prompt = _append_field_specific_guidance(prompt, field)
 
-    completion = client.chat.completions.create(
+    completion = get_client().chat.completions.create(
         model="qwen-plus",
         messages=[
             {"role": "system", "content": "你是一名医疗数据解析助手"},
