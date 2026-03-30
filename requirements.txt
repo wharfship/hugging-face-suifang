@@ -2,4 +2,3 @@ pandas
 openpyxl
 openai
 gradio
-git push hf main
